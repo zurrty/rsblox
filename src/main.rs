@@ -1,5 +1,3 @@
-#![feature(fs_try_exists)]
-
 pub mod gui;
 pub mod prefix;
 use std::path::PathBuf;

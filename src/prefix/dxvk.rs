@@ -66,7 +66,7 @@ pub async fn download_dxvk(version: DXVKRelease) -> Result<PathBuf, Box<dyn std:
 
     file.write_all(&content)?;
     let out_path = crate::data_path().join("components").join("dxvk");
-    if !std::fs::try_exists(&out_path)? {
+    if !out_path.exists() {
         std::fs::create_dir_all(&out_path)?;
     }
     Command::new("tar")

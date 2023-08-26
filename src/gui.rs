@@ -45,7 +45,7 @@ pub(crate) async fn gui(prefix: &WinePrefix) -> crate::Result<()> {
     match select(choices, "What do you want to do?")? {
         0 => {
             if let Ok(player_path) = prefix.find_player() {
-                prefix.execute(player_path, &[])?;
+                prefix.run(player_path)?;
             } else {
                 println!("Roblox player is either not installed or could not be located.")
             }
@@ -80,7 +80,7 @@ async fn manage_components(prefix: &WinePrefix) -> Result<(), Box<dyn std::error
         /* DXVK */
         0 => match select(&["Toggle", "Download"], "Manage Components > DXVK")? {
             0 => {
-                if !std::fs::try_exists(&dxvk_path)? {
+                if !dxvk_path.exists() {
                     std::fs::create_dir_all(&dxvk_path)?;
                 }
                 if Dxvk::get_version(&prefix.path()).unwrap_or(None).is_some() {
