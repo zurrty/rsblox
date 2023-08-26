@@ -1,7 +1,7 @@
 #![feature(fs_try_exists)]
+
 pub mod gui;
 pub mod prefix;
-
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -46,11 +46,6 @@ async fn main() {
         None => prefix::WinePrefix::default(),
     };
     if let Some(input) = args.input {
-        std::fs::write(
-            "/home/zurrty/Documents/Projects/Rust/rsblox/target/rsblox-output.txt",
-            &input,
-        )
-        .unwrap();
         if input.starts_with("roblox-player:") {
             prefix
                 .run_args(&[prefix.find_launcher().unwrap().to_str().unwrap(), &input])

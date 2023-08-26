@@ -1,4 +1,4 @@
-pub mod components;
+pub mod dxvk;
 
 use std::fs;
 use std::io::{self, Result};
@@ -26,9 +26,7 @@ impl Default for WinePrefix {
 impl WinePrefix {
     pub fn new(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
-        if !fs::try_exists(path)? {
-            fs::create_dir_all(path).ok();
-        }
+        fs::create_dir_all(path)?;
         let mut wine = Wine::default();
         wine.prefix = Some(path.to_owned());
         Ok(Self { wine })
@@ -71,23 +69,23 @@ impl WinePrefix {
     }
     pub async fn install_roblox(&self) -> std::result::Result<(), Box<dyn std::error::Error>> {
         use std::io::Write;
-        const URL: &str = "http://roblox.com/download/client";
-        const EXE: &str = "/tmp/RobloxPlayerLauncher.exe";
-        if !fs::try_exists(EXE)? {
+        const URL: &str = "https://roblox.com/download/client";
+        const INSTALLER_PATH: &str = "/tmp/RobloxPlayerLauncher.exe";
+        if !fs::try_exists(INSTALLER_PATH)? {
             let response = reqwest::get(URL).await?;
 
             if !response.status().is_success() {
                 return Err(String::from("Failed to download Roblox installer!").into());
             }
 
-            let mut file = std::fs::File::create(EXE)?;
+            let mut file = std::fs::File::create(INSTALLER_PATH)?;
 
             let content = response.bytes().await?;
 
             file.write_all(&content)?;
         }
-        println!("If the installer fails with \"An error occurred in the secure channel support\", you need to install lib32-gnutls from your distributions package manager.");
-        self.wine.run(EXE)?;
+         // If the installer fails with "An error occurred in the secure channel support", you need to install lib32-gnutls from your distribution's package manager."
+        self.wine.run(INSTALLER_PATH)?;
         Ok(())
     }
     pub fn find_player(&self) -> io::Result<PathBuf> {

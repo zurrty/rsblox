@@ -17,12 +17,13 @@ fn select(choices: &[&str], prompt: &str) -> crate::Result<usize> {
         .default(0)
         .interact()?)
 }
-
+// for if i want multiple choice things
+#[allow(unused)]
 fn multi(choices: &[(&str, bool)], prompt: &str) -> crate::Result<Vec<usize>> {
     let mut items = Vec::with_capacity(choices.len());
     let mut defaults = Vec::with_capacity(choices.len());
     choices.iter().for_each(|(item, value)| {
-        items.push(item.clone());
+        items.push(item);
         defaults.push(value.clone());
     });
     Ok(MultiSelect::with_theme(&ColorfulTheme::default())
@@ -43,18 +44,28 @@ pub(crate) async fn gui(prefix: &WinePrefix) -> crate::Result<()> {
 
     match select(choices, "What do you want to do?")? {
         0 => {
-            if prefix.execute(prefix.find_player()?, &[]).is_err() {
-                println!("Roblox player is not installed or could not be located.")
+            if let Ok(player_path) = prefix.find_player() {
+                prefix.execute(player_path, &[])?;
+            } else {
+                println!("Roblox player is either not installed or could not be located.")
             }
         }
         1 => manage_components(prefix).await?,
         2 => prefix.install_roblox().await?,
         3 => {
             println!("Starting Winetricks...");
-            Command::new("winetricks")
+            let process = Command::new("winetricks")
                 .env("WINE_PREFIX", prefix.path().to_str().unwrap())
-                .spawn()?
-                .wait()?;
+                .spawn();
+            match process {
+                Ok(mut process) => {
+                    process.wait()?;
+                }
+                Err(_) => {
+                    println!("Winetricks is not installed.");
+                    return Ok(())
+                }
+            }
             gui(&prefix).await?;
         }
         _ => return Ok(()),
@@ -76,12 +87,12 @@ async fn manage_components(prefix: &WinePrefix) -> Result<(), Box<dyn std::error
                     prefix.wine.uninstall_dxvk(InstallParams::default())?;
                     println!("DXVK disabled.");
                 } else {
-                    let versions = crate::prefix::components::dxvk_installed_versions()?;
+                    let versions = crate::prefix::dxvk::dxvk_installed_versions()?;
                     if versions.is_empty() {
                         println!("No DXVK versions installed, choose one to download:");
                         download_dxvk(prefix, false).await?;
                     }
-                    let versions = crate::prefix::components::dxvk_installed_versions()?;
+                    let versions = crate::prefix::dxvk::dxvk_installed_versions()?;
                     let index = select(
                         &versions.iter().map(|s| s.as_str()).collect_vec(),
                         "Select DXVK Version",
@@ -95,7 +106,9 @@ async fn manage_components(prefix: &WinePrefix) -> Result<(), Box<dyn std::error
                 }
             }
             1 => {
-                download_dxvk(prefix, true).await.expect("Failed to install DXVK.");
+                download_dxvk(prefix, true)
+                    .await
+                    .expect("Failed to install DXVK.");
             }
             _ => {}
         },
@@ -111,19 +124,20 @@ async fn download_dxvk(
     prefix: &WinePrefix,
     ask_to_install: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let versions = crate::prefix::components::dxvk_versions().await?;
+    let versions = crate::prefix::dxvk::dxvk_versions().await?;
     let index = select(
         &versions.iter().map(|v| v.tag_name.as_str()).collect_vec(),
         "Select DXVK Version",
     )?;
     if let Some(version) = versions.get(index).cloned() {
-        let path = crate::prefix::components::download_dxvk(version).await?;
+        let path = crate::prefix::dxvk::download_dxvk(version).await?;
         if ask_to_install
             && dialoguer::Confirm::new()
                 .with_prompt("Would you like to enable DXVK now?")
-                .interact()? == false
+                .interact()?
+                == false
         {
-            return Ok(())
+            return Ok(());
         }
         prefix.wine.install_dxvk(path, InstallParams::default())?;
     }

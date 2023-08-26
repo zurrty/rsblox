@@ -1,4 +1,4 @@
-# RSBlox
+# rsblox
 Wine prefix manager for Roblox, made in Rust
 ## NOTE:
 As of May 3, 2023, Roblox does not support Wine anymore.
@@ -23,3 +23,6 @@ you can also have multiple installs:
 ```sh
 rsblox --install OtherInstall
 ```
+
+## Building
+To build rsblox, you need to have the rust nightly toolchain. This is because rsblox makes use of `std::fs::try_exists` which is currently in experimental stages. This will likely be implemented into the stable standard library in the future.
