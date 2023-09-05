@@ -8,6 +8,7 @@ use itertools::Itertools;
 use wincompatlib::prelude::Dxvk;
 use wincompatlib::prelude::InstallParams;
 
+use crate::Error;
 use crate::prefix::WinePrefix;
 
 fn select(choices: &[&str], prompt: &str) -> crate::Result<usize> {
@@ -44,10 +45,11 @@ pub(crate) async fn gui(prefix: &WinePrefix) -> crate::Result<()> {
 
     match select(choices, "What do you want to do?")? {
         0 => {
-            if let Ok(player_path) = prefix.find_player() {
-                prefix.run(player_path)?;
-            } else {
-                println!("Roblox player is either not installed or could not be located.")
+            match prefix.find_player() {
+                Ok(player_path) => {
+                    prefix.run(player_path)?;
+                }
+                _ => return Err(Error::PlayerNotInstalled),
             }
         }
         1 => manage_components(prefix).await?,
@@ -62,8 +64,7 @@ pub(crate) async fn gui(prefix: &WinePrefix) -> crate::Result<()> {
                     process.wait()?;
                 }
                 Err(_) => {
-                    println!("Winetricks is not installed.");
-                    return Ok(())
+                    return Err(Error::WinetricksNotInstalled)
                 }
             }
             gui(&prefix).await?;

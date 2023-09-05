@@ -1,8 +1,7 @@
 pub mod gui;
 pub mod prefix;
+use clap::{arg, Command, Parser};
 use std::path::PathBuf;
-
-use clap::Parser;
 
 pub fn data_path() -> PathBuf {
     let mut path = PathBuf::from(
@@ -14,9 +13,12 @@ pub fn data_path() -> PathBuf {
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    WinetricksNotInstalled,
+    PlayerNotInstalled,
+
     IO(#[from] std::io::Error),
     Reqwest(#[from] reqwest::Error),
-    Unknown(#[from] Box<dyn std::error::Error>),
+    Other(#[from] Box<dyn std::error::Error>),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -30,36 +32,70 @@ impl std::fmt::Display for Error {
 #[derive(Debug, Parser)]
 struct Args {
     #[arg(short, long)]
-    install: Option<String>,
+    install: Option<PathBuf>,
+
     input: Option<String>,
 }
 
+fn cli() -> Command {
+    Command::new("rsblox")
+        .arg_required_else_help(false)
+        .arg(arg!(-i --install [INSTALL] "Path to wine prefix"))
+        .subcommand(
+            Command::new("player")
+                .alias("app")
+                .about("Launches Roblox experiences")
+                .arg(arg!([INPUT])),
+        )
+        .subcommand(
+            Command::new("studio")
+                .about("Launches Roblox Studio")
+                .arg(arg!([INPUT])),
+        )
+}
+
 #[tokio::main]
-async fn main() {
-    let args = Args::parse();
-    let prefix = match args.install {
+async fn main() -> Result<()> {
+    let matches = cli().get_matches();
+    let is_interactive = dialoguer::console::user_attended();
+
+    let prefix = match matches.get_one::<PathBuf>("INSTALL") {
         Some(path) => {
-            prefix::WinePrefix::new(prefix::installs_path().join(path)).unwrap_or_default()
+            if path.is_absolute() {
+                prefix::WinePrefix::new(path).unwrap_or_default()
+            } else {
+                prefix::WinePrefix::new(prefix::installs_path().join(path)).unwrap_or_default()
+            }
         }
         None => prefix::WinePrefix::default(),
     };
-    if let Some(input) = args.input {
-        if input.starts_with("roblox-player:") {
-            prefix
-                .run_args(&[prefix.find_launcher().unwrap().to_str().unwrap(), &input])
-                .unwrap();
-        } else if input.starts_with("roblox-studio:") {
-            prefix
-                .run_args(&[prefix.find_studio().unwrap().to_str().unwrap(), &input])
-                .unwrap();
-        } else if input == "install" {
-            prefix.install_roblox().await.unwrap();
-        } else if input == "app" {
-            prefix
-                .run(prefix.find_player().unwrap().to_str().unwrap())
-                .unwrap();
+
+    match matches.subcommand() {
+        Some(("player", submatches)) => {
+            let player_path = prefix.find_player()?;
+            let input = submatches
+                .get_one::<String>("INPUT")
+                .cloned()
+                .unwrap_or_default();
+            prefix.run_args(&[player_path.to_str().unwrap(), &input])?;
         }
-    } else {
-        gui::gui(&prefix).await.unwrap();
+        Some(("studio", submatches)) => {
+            let studio_path = prefix.find_studio()?;
+            let input = submatches
+                .get_one::<String>("INPUT")
+                .cloned()
+                .unwrap_or_default();
+            prefix.run_args(&[studio_path.to_str().unwrap(), &input])?;
+        }
+        _ => {
+            if is_interactive {
+                gui::gui(&prefix).await?;
+            }
+            else {
+                let launcher_path = prefix.find_player()?;
+                prefix.run(launcher_path)?;
+            }
+        }
     }
+    Ok(())
 }

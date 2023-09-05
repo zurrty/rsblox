@@ -35,9 +35,9 @@ impl WinePrefix {
         self.wine.prefix.as_ref().unwrap()
     }
     pub fn versions_path(&self) -> PathBuf {
-        let user = std::env::var("USER").unwrap_or("Public".into());
+        let user = std::env::var("USER").expect("No user found.");
         let path = format!("drive_c/users/{user}/AppData/Local/Roblox/Versions");
-        self.path().join(path)
+        self.wine.prefix.clone().unwrap().join(path)
     }
     pub fn versions(&self) -> Result<Vec<PathBuf>> {
         let versions = std::fs::read_dir(self.versions_path())?
@@ -61,10 +61,9 @@ impl WinePrefix {
     }
     pub async fn install_roblox(&self) -> std::result::Result<(), Box<dyn std::error::Error>> {
         use std::io::Write;
-        const URL: &str = "https://roblox.com/download/client";
         const INSTALLER_PATH: &str = "/tmp/RobloxPlayerLauncher.exe";
         if !Path::new(INSTALLER_PATH).exists() {
-            let response = reqwest::get(URL).await?;
+            let response = reqwest::get("https://roblox.com/download/client").await?;
 
             if !response.status().is_success() {
                 return Err(String::from("Failed to download Roblox installer!").into());
@@ -80,33 +79,22 @@ impl WinePrefix {
         self.wine.run(INSTALLER_PATH)?;
         Ok(())
     }
-    pub fn find_player(&self) -> io::Result<PathBuf> {
+    fn find_exe_file(&self, exe_name: &str) -> io::Result<PathBuf> {
         for version in self.versions()? {
-            println!("{:?}", version);
-            let exe_path = version.join("RobloxPlayerBeta.exe");
+            let exe_path = version.join(exe_name);
             if exe_path.exists() {
                 return Ok(exe_path);
             }
         }
         Err(io::ErrorKind::NotFound.into())
+    }
+    pub fn find_player(&self) -> io::Result<PathBuf> {
+        self.find_exe_file("RobloxPlayerBeta.exe")
     }
     pub fn find_launcher(&self) -> io::Result<PathBuf> {
-        for version in self.versions()? {
-            println!("{:?}", version);
-            let exe_path = version.join("RobloxPlayerLauncher.exe");
-            if exe_path.exists() {
-                return Ok(exe_path);
-            }
-        }
-        Err(io::ErrorKind::NotFound.into())
+        self.find_exe_file("RobloxPlayerLauncher.exe")
     }
     pub fn find_studio(&self) -> io::Result<PathBuf> {
-        for version in self.versions()? {
-            let exe_path = version.join("RobloxStudioBeta.exe");
-            if exe_path.exists() {
-                return Ok(exe_path);
-            }
-        }
-        Err(io::ErrorKind::NotFound.into())
+        self.find_exe_file("RobloxStudioBeta.exe")
     }
 }
